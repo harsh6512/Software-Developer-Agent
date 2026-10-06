@@ -1,0 +1,29 @@
+{
+    "name": "@agentic/agent",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "langgraphjs dev --no-browser --config ../../langgraph.json",
+        "build": "tsc",
+        "lint": "eslint .",
+        "test": "jest"
+    },
+    "dependencies": {
+        "@daytonaio/sdk": "^0.25.5",
+        "@langchain/anthropic": "^0.3.26",
+        "@langchain/core": "^0.3.65",
+        "@langchain/langgraph": "^0.3.8",
+        "@langchain/langgraph-sdk": "^0.0.95",
+        "@langchain/openai": "^0.5.10",
+        "@octokit/rest": "^22.0.0",
+        "dotenv": "^16.4.7",
+        "uuid": "^11.0.5",
+        "zod": "^3.24.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "tsx": "^4.19.0",
+        "typescript": "^5.7.0"
+    }
+}
