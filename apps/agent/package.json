@@ -10,7 +10,8 @@
         "test": "jest"
     },
     "dependencies": {
-        "@daytonaio/sdk": "^0.25.5",
+        "@agentic/shared": "workspace:*",
+        "@daytonaio/sdk": "^0.224.0",
         "@langchain/anthropic": "^0.3.26",
         "@langchain/core": "^0.3.65",
         "@langchain/langgraph": "^0.3.8",
@@ -23,7 +24,7 @@
     },
     "devDependencies": {
         "@types/node": "^22.0.0",
-        "tsx": "^4.19.0",
+        "tsx": "^4.23.15",
         "typescript": "^5.7.0"
     }
 }
