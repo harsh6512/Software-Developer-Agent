@@ -102,7 +102,9 @@ const _tmpSearchToolSchema = createGrepToolFields({
     owner: "x",
     repo: "x",
 }).schema;
+
 export type GrepCommand = z.infer<typeof _tmpSearchToolSchema>;
+
 export function formatGrepCommand(
     cmd: GrepCommand,
     options?: {
@@ -154,4 +156,41 @@ export function formatGrepCommand(
         args.push(escapeShellArg(cmd.query));
     }
     return args;
+}
+
+export function createViewToolFields(targetRepository: TargetRepository) {
+    const repoRoot = getRepoAbsolutePath(targetRepository);
+
+    const viewSchema = z.object({
+        command: z.enum(["view"]).describe("The command to execute: view"),
+        path: z
+            .string()
+            .describe("The relative or absolute path to the file or directory to inspect"),
+
+        view_range: z
+            .tuple([
+                z.number().int().min(1),
+                z.number().int(),
+            ])
+            .refine(
+                ([start, end]) => end === -1 || end >= start,
+                {
+                    message:
+                        "End must be -1 (read to end of file) or greater than or equal to start.",
+                },
+            )
+            .optional()
+            .describe(
+                "Optional [start, end] line range using 1-based line numbers. Start must be at least 1. End must be -1 to read to the end of the file, or greater than or equal to start.",
+            ),
+    });
+
+    return {
+        name: "view",
+        description:
+            "A text editor tool that can view files or list directory contents. " +
+            `The working directory is \`${repoRoot}\`. ` +
+            "Always use this tool to inspect file contents before editing them.",
+        schema: viewSchema,
+    };
 }
