@@ -194,3 +194,50 @@ export function createViewToolFields(targetRepository: TargetRepository) {
         schema: viewSchema,
     };
 }
+
+export function createTextEditorToolFields(targetRepository: TargetRepository) {
+    const repoRoot = getRepoAbsolutePath(targetRepository);
+
+    const textEditorSchema = z.object({
+        command: z
+            .enum(["view", "create", "str_replace", "insert"])
+            .describe("The command to run: view, create, str_replace, or insert."),
+        path: z
+            .string()
+            .describe("The relative or absolute path to the file to create or modify."),
+        file_text: z
+            .string()
+            .optional()
+            .describe("Required for 'create'. The content of the file to create."),
+        old_str: z
+            .string()
+            .optional()
+            .describe(
+                "Required for 'str_replace'. The exact string in the file to replace. Must match exactly one location.",
+            ),
+        new_str: z
+            .string()
+            .optional()
+            .describe(
+                "Required for 'str_replace' and 'insert'. The new string to replace old_str with, or the text to insert.",
+            ),
+        insert_line: z
+            .number()
+            .optional()
+            .describe(
+                "Required for 'insert'. The line number after which to insert the text (0-indexed or 1-indexed).",
+            ),
+        view_range: z
+            .array(z.number())
+            .optional()
+            .describe("Optional line range [start, end] for 'view'."),
+    });
+
+    return {
+        name: "text_editor",
+        description:
+            `Custom text editor tool for viewing, creating, and editing files in \`${repoRoot}\`. ` +
+            "Use 'create' to create new files, and 'str_replace' to perform precise find-and-replace modifications.",
+        schema: textEditorSchema,
+    };
+}
