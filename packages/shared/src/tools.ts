@@ -241,3 +241,23 @@ export function createTextEditorToolFields(targetRepository: TargetRepository) {
         schema: textEditorSchema,
     };
 }
+
+export function createApplyPatchToolFields(targetRepository: TargetRepository) {
+    const repoRoot = getRepoAbsolutePath(targetRepository);
+    const applyPatchToolSchema = z.object({
+        diff: z
+            .string()
+            .describe(
+                "The unified diff to apply. Use standard git diff format (--- a/file, +++ b/file, @@ ... @@). Ensure this field is ALWAYS provided.",
+            ),
+        file_path: z.string().describe("The file path to apply the diff to."),
+    });
+
+    return {
+        name: "apply_patch",
+        description:
+            "Applies a git unified diff to a file given a file path and diff content. " +
+            `The working directory is \`${repoRoot}\`. Ensure file paths are relative to this directory.`,
+        schema: applyPatchToolSchema,
+    };
+}
