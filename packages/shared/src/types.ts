@@ -1,5 +1,6 @@
 import { Annotation, messagesStateReducer } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
+import { RunnableConfig } from "@langchain/core/runnables";
 
 // Target Git repository
 export interface TargetRepository {
@@ -133,6 +134,35 @@ export const GraphAnnotation = Annotation.Root({
     }),
 });
 
-// TypeScript helpers derived from Annotation
+// Configuration options passed into graph nodes and tools via LangGraph
+export interface GraphConfigurable {
+    thread_id?: string;
+    run_id?: string;
+    assistant_id?: string;
+
+    // Custom API keys optionally passed per run/session
+    apiKeys?: {
+        googleApiKey?: string;
+        anthropicApiKey?: string;
+        openaiApiKey?: string;
+        [key: string]: string | undefined;
+    };
+
+    // Model overrides per task
+    plannerModelName?: string;
+    programmerModelName?: string;
+    reviewerModelName?: string;
+    testingModelName?: string;
+    routerModelName?: string;
+    summarizerModelName?: string;
+
+    // Execution bounds
+    maxReviewCount?: number;
+    maxContextActions?: number;
+
+    [key: string]: unknown;
+}
+
+export type GraphConfig = RunnableConfig<GraphConfigurable>;
 export type GraphState = typeof GraphAnnotation.State;
 export type GraphUpdate = typeof GraphAnnotation.Update;
