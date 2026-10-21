@@ -4,7 +4,6 @@ import { createLogger } from "../logger.js";
 import { withRetry } from "../retry.js";
 
 const logger = createLogger("GitHub-Git");
-
 /**
  * Performs the actual Git clone operation inside the Daytona sandbox.
  */
@@ -25,12 +24,12 @@ async function performClone(
         githubInstallationToken,
     } = args;
 
-    const branch = branchName || targetRepository.branch || "main";
+    // clone the existing upstream base branch (e.g. "main" or "master")
+    const baseBranch = targetRepository.branch || "main";
 
-    logger.info("Cloning repository into Daytona sandbox", {
+    logger.info("Cloning repository from upstream base branch", {
         repoPath: `${targetRepository.owner}/${targetRepository.repo}`,
-        branch,
-        baseCommit: targetRepository.baseCommit,
+        baseBranch,
         absoluteRepoDir,
     });
 
@@ -39,12 +38,12 @@ async function performClone(
             await sandbox.git.clone(
                 cloneUrl,
                 absoluteRepoDir,
-                branch,
+                baseBranch,
                 targetRepository.baseCommit,
                 githubInstallationToken ? "git" : undefined,
                 githubInstallationToken,
             );
-            return branch;
+            return baseBranch;
         },
         { retries: 3, delay: 1000 },
     );
@@ -53,12 +52,33 @@ async function performClone(
         throw cloneRes;
     }
 
-    logger.info("Successfully cloned repository into Daytona sandbox", {
+    // 2. Once cloned, create and switch to the new agent working branch!
+    if (branchName && branchName !== baseBranch) {
+        logger.info(`Creating and checking out working branch: ${branchName}`);
+        try {
+            if (typeof sandbox.git?.createBranch === "function") {
+                await sandbox.git.createBranch(absoluteRepoDir, branchName);
+            } else {
+                await sandbox.process.executeCommand(
+                    `git checkout -b "${branchName}"`,
+                    absoluteRepoDir,
+                );
+            }
+        } catch (err) {
+            logger.warn(`Could not create branch ${branchName}, attempting checkout:`, { err: String(err) });
+            await sandbox.process.executeCommand(
+                `git checkout "${branchName}"`,
+                absoluteRepoDir,
+            );
+        }
+    }
+
+    logger.info("Successfully set up repository and working branch in sandbox", {
         repoPath: `${targetRepository.owner}/${targetRepository.repo}`,
-        branch,
+        activeBranch: branchName || baseBranch,
     });
 
-    return branch;
+    return branchName || baseBranch;
 }
 
 /**
