@@ -1,11 +1,19 @@
 export const MODEL_OPTIONS = [
     {
-        label: "Gemini 1.5 Pro",
-        value: "google-genai:gemini-1.5-pro",
+        label: "Gemini 3.8 Flash",
+        value: "google-genai:gemini-3.8-flash",
     },
     {
-        label: "Gemini 2.0 Flash",
-        value: "google-genai:gemini-2.0-flash",
+        label: "Gemini 2.5 Pro",
+        value: "google-genai:gemini-2.5-pro",
+    },
+    {
+        label: "Gemini Flash Latest",
+        value: "google-genai:gemini-flash-latest",
+    },
+    {
+        label: "Gemini 3.1 Flash Lite",
+        value: "google-genai:gemini-3.1-flash-lite",
     },
     {
         label: "Claude 3.5 Sonnet",
