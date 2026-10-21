@@ -168,17 +168,7 @@ export function createViewToolFields(targetRepository: TargetRepository) {
             .describe("The relative or absolute path to the file or directory to inspect"),
 
         view_range: z
-            .tuple([
-                z.number().int().min(1),
-                z.number().int(),
-            ])
-            .refine(
-                ([start, end]) => end === -1 || end >= start,
-                {
-                    message:
-                        "End must be -1 (read to end of file) or greater than or equal to start.",
-                },
-            )
+            .array(z.number().int())
             .optional()
             .describe(
                 "Optional [start, end] line range using 1-based line numbers. Start must be at least 1. End must be -1 to read to the end of the file, or greater than or equal to start.",
