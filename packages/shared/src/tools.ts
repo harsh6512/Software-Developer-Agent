@@ -261,3 +261,24 @@ export function createApplyPatchToolFields(targetRepository: TargetRepository) {
         schema: applyPatchToolSchema,
     };
 }
+
+export function createSessionPlanToolFields() {
+    const sessionPlanSchema = z.object({
+        title: z
+            .string()
+            .describe(
+                "A short, one-sentence description of the user request and the plan to fulfill it.",
+            ),
+        plan: z
+            .array(z.string())
+            .describe(
+                "A list of sequential, concrete steps to implement the request. Each step must be clear and actionable.",
+            ),
+    });
+
+    return {
+        name: "session_plan",
+        description: "Call this tool to generate the structured implementation plan.",
+        schema: sessionPlanSchema,
+    };
+}
