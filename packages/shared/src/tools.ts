@@ -272,3 +272,20 @@ export function createSessionPlanToolFields() {
         schema: sessionPlanSchema,
     };
 }
+
+export function createMarkTaskCompletedToolFields() {
+    const schema = z.object({
+        completed_task_summary: z
+            .string()
+            .describe(
+                "A concise summary of the actions taken, files edited or created, and tests verified to complete this task item.",
+            ),
+    });
+
+    return {
+        name: "mark_task_completed",
+        description:
+            "Mark the currently active task item in the plan as completed once all code changes and checks for it are finished.",
+        schema,
+    };
+}
