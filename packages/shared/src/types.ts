@@ -145,6 +145,7 @@ export interface GraphConfigurable {
         googleApiKey?: string;
         anthropicApiKey?: string;
         openaiApiKey?: string;
+        openrouterApiKey?: string;
         [key: string]: string | undefined;
     };
 

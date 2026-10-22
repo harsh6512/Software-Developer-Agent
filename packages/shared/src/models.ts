@@ -31,4 +31,8 @@ export const MODEL_OPTIONS = [
         label: "GPT 4o mini",
         value: "openai:gpt-4o-mini",
     },
+    {
+        label: "OpenRouter Free",
+        value: "openrouter:openrouter/free",
+    },
 ];
