@@ -5,10 +5,10 @@ import {
     formatGrepCommand,
     getRepoAbsolutePath,
     TargetRepository,
+    TIMEOUT_SEC
 } from "@agentic/shared";
 import { getSandboxErrorFields } from "../utils/sandbox-error-fields.js";
 import { createLogger } from "../utils/logger.js";
-import { TIMEOUT_SEC } from "../constants.js";
 import { createShellExecutor } from "../utils/shell-executor.js";
 import { wrapScript } from "../utils/wrap-script.js";
 
