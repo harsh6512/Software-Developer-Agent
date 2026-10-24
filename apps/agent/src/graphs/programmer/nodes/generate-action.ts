@@ -106,6 +106,8 @@ export async function generateAction(
     });
 
     return {
+        messages: [response],
         internalMessages: [response],
     };
+
 }
