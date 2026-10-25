@@ -73,3 +73,33 @@ export function completePlanItem(
         tasks: updatedTasks,
     };
 }
+
+export function updateTaskPlanItems(
+    taskPlan: TaskPlan,
+    taskId: string,
+    newPlanItems: PlanItem[],
+    createdBy: "agent" | "user" = "agent",
+): TaskPlan {
+    const taskIndex = taskPlan.tasks.findIndex((t) => t.id === taskId);
+    if (taskIndex === -1) {
+        throw new Error(`Task with ID ${taskId} not found`);
+    }
+    const task = taskPlan.tasks[taskIndex];
+    const newRevision: PlanRevision = {
+        revisionIndex: task.planRevisions.length,
+        plans: newPlanItems,
+        createdAt: Date.now(),
+        createdBy,
+    };
+    const updatedTask: Task = {
+        ...task,
+        planRevisions: [...task.planRevisions, newRevision],
+        activeRevisionIndex: task.planRevisions.length,
+    };
+    const updatedTasks = [...taskPlan.tasks];
+    updatedTasks[taskIndex] = updatedTask;
+    return {
+        ...taskPlan,
+        tasks: updatedTasks,
+    };
+}

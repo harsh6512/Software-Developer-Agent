@@ -289,3 +289,19 @@ export function createMarkTaskCompletedToolFields() {
         schema,
     };
 }
+
+export function createUpdatePlanToolFields() {
+    const schema = z.object({
+        update_plan_reasoning: z
+            .string()
+            .describe(
+                "Detailed reasoning explaining why the plan needs to be updated, which steps to modify/remove, or what new steps must be added.",
+            ),
+    });
+    return {
+        name: "update_plan",
+        description:
+            "Call this tool when you determine the current plan needs to be updated, tasks need to be added or removed, or the strategy must change based on what you discovered while coding.",
+        schema,
+    };
+}

@@ -8,6 +8,7 @@ import {
     getActivePlanItems,
     createMarkTaskCompletedToolFields,
     getRepoAbsolutePath,
+    createUpdatePlanToolFields
 } from "@agentic/shared";
 import { createLogger } from "../../../utils/logger.js";
 import { getModelManager } from "../../../utils/llms/model-manager.js";
@@ -86,6 +87,7 @@ export async function generateAction(
     const view = createViewTool({ sandbox, targetRepository: state.targetRepository });
     const grep = createGrepTool({ sandbox, targetRepository: state.targetRepository });
     const markCompleted = createMarkTaskCompletedToolFields();
+    const updatePlan = createUpdatePlanToolFields();
 
     const modelWithTools = model.bindTools([
         textEditor,
@@ -94,6 +96,7 @@ export async function generateAction(
         view,
         grep,
         markCompleted,
+        updatePlan
     ]);
 
     const systemMessage = new SystemMessage(formatProgrammerSystemPrompt(state));
