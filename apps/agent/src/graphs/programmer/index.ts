@@ -70,6 +70,7 @@ const workflow = new StateGraph(GraphAnnotation)
         "handle-completed-task",
         "update-plan", // <-- 4. Add conditional edge destination
         "generate-conclusion",
+        "generate-action",
     ])
     .addEdge("take-action", "generate-action")
     .addEdge("update-plan", "generate-action") // <-- 5. Loop back to generate-action after plan is updated
