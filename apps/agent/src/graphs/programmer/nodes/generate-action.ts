@@ -67,6 +67,7 @@ ${state.contextGatheringNotes || "No preliminary notes."}
 3. Use shell to run builds, linters, or tests to verify your changes.
 4. When you have fully completed and verified the current task, call the mark_task_completed tool with a concise summary of the work done.
 5. Do NOT call mark_task_completed in parallel with other tools. Run your edits/tests first, verify, then call mark_task_completed in a subsequent step.
+6. If during coding you discover the plan is missing steps or needs to change, call the update_plan tool with your reasoning.
 </guidelines>`;
 }
 
