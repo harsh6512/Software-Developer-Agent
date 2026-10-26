@@ -13,16 +13,20 @@
         "@agentic/shared": "workspace:*",
         "@daytonaio/sdk": "^0.224.0",
         "@langchain/anthropic": "^0.3.26",
-        "@langchain/core": "^0.3.65",
+        "@langchain/core": "^1.2.19",
+        "@langchain/google-genai": "^2.3.4",
         "@langchain/langgraph": "^0.3.8",
         "@langchain/langgraph-sdk": "^0.0.95",
         "@langchain/openai": "^0.5.10",
         "@octokit/rest": "^22.0.0",
+        "diff": "^9.0.0",
         "dotenv": "^16.4.7",
+        "langchain": "^0.3.0",
         "uuid": "^11.0.5",
         "zod": "^3.24.0"
     },
     "devDependencies": {
+        "@types/diff": "^8.0.0",
         "@types/node": "^22.0.0",
         "tsx": "^4.23.15",
         "typescript": "^5.7.0"
