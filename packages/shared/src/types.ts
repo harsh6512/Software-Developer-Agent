@@ -65,9 +65,7 @@ export interface CustomRules {
     pullRequestFormatting?: string;
 }
 
-// -------------------------------------------------------------------------
-// LangGraph State Definition
-// -------------------------------------------------------------------------
+// langraph state defination 
 export const GraphAnnotation = Annotation.Root({
     // User-facing messages displayed in the UI chat
     messages: Annotation<BaseMessage[]>({
@@ -126,6 +124,16 @@ export const GraphAnnotation = Annotation.Root({
     reviewsCount: Annotation<number>({
         reducer: (_prev, next) => next,
         default: () => 0,
+    }),
+
+    // Review verdict: true if approved, false if fixes needed
+    reviewApproved: Annotation<boolean | undefined>({
+        reducer: (_prev, next) => next,
+    }),
+
+    // Detailed feedback left by the reviewer
+    reviewFeedback: Annotation<string | undefined>({
+        reducer: (_prev, next) => next,
     }),
 
     // Custom rules or style guides

@@ -305,3 +305,24 @@ export function createUpdatePlanToolFields() {
         schema,
     };
 }
+
+export function createCodeReviewToolFields() {
+    const schema = z.object({
+        approved: z
+            .boolean()
+            .describe("Set to true if the code changes completely and correctly solve the task with high quality. Set to false if there are bugs, missing requirements, or improvements needed."),
+        feedback: z
+            .string()
+            .describe("Detailed, constructive feedback on the code changes, explaining why it was approved or what specifically needs to be fixed."),
+        additional_tasks: z
+            .array(z.string())
+            .optional()
+            .describe("If approved is false, provide a list of specific corrective tasks that the programmer must execute to fix the issues."),
+    });
+
+    return {
+        name: "submit_code_review",
+        description: "Submit your final code review verdict on the git diff and code modifications.",
+        schema,
+    };
+}
