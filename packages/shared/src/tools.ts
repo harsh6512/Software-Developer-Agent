@@ -326,3 +326,15 @@ export function createCodeReviewToolFields() {
         schema,
     };
 }
+
+export function createOpenPrToolFields() {
+    const schema = z.object({
+        title: z.string().describe("Concise, conventional PR title (e.g. 'feat: implement calculator module')"),
+        body: z.string().describe("Markdown description outlining the problem, solution, modified files, and verification performed."),
+    });
+    return {
+        name: "open_pr",
+        description: "Generate the title and body for the final Pull Request.",
+        schema,
+    };
+}

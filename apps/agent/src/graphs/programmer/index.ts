@@ -11,6 +11,7 @@ import { handleCompletedTask } from "./nodes/handle-completed-task.js";
 import { updatePlan } from "./nodes/update-plan.js";
 import { generateConclusion } from "./nodes/generate-conclusion.js";
 import { reviewerGraph } from "../reviewer/index.js";
+import { openPullRequest } from "./nodes/open-pr.js";
 
 const MAX_REVIEW_CYCLES = 3;
 
@@ -84,6 +85,7 @@ const workflow = new StateGraph(GraphAnnotation)
     .addNode("update-plan", updatePlan)
     .addNode("reviewer-subgraph", reviewerGraph)
     .addNode("generate-conclusion", generateConclusion)
+    .addNode("open-pr", openPullRequest)
 
     .addEdge(START, "generate-action")
     .addConditionalEdges("generate-action", routeProgrammerAction, [
@@ -105,7 +107,8 @@ const workflow = new StateGraph(GraphAnnotation)
         "generate-action",
         "generate-conclusion",
     ])
-    .addEdge("generate-conclusion", END);
+    .addEdge("generate-conclusion", "open-pr")
+    .addEdge("open-pr", END)
 
 export const programmerGraph = workflow.compile();
 programmerGraph.name = "Agentic Programmer";
