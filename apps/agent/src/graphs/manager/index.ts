@@ -1,9 +1,9 @@
 import { StateGraph, START, END } from "@langchain/langgraph";
-import { ManagerGraphAnnotation } from "@agentic/shared";
+import { ManagerGraphState, ManagerGraphAnnotation } from "@agentic/shared";
 import { classifyMessage } from "./nodes/classify-message.js";
 import { startPlanner } from "./nodes/start-planner.js";
 
-function routeFromClassify(state: any): "start-planner" | typeof END {
+function routeFromClassify(state: ManagerGraphState): "start-planner" | typeof END {
     if (state.nextRoute === "start-planner") {
         return "start-planner";
     }

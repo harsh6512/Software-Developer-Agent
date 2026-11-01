@@ -39,6 +39,11 @@ export const ManagerGraphAnnotation = Annotation.Root({
         reducer: (_prev, next) => next,
         default: () => false,
     }),
+
+    nextRoute: Annotation<"start-planner" | "reply" | undefined>({
+        reducer: (_prev, next) => next,
+        default: () => undefined,
+    }),
 });
 
 export type ManagerGraphState = typeof ManagerGraphAnnotation.State;
