@@ -1,0 +1,14 @@
+{
+    "node_version": "20",
+    "graphs": {
+        "manager": "./apps/agent/src/graphs/manager/index.ts:managerGraph",
+        "planner": "./apps/agent/src/graphs/planner/index.ts:plannerGraph",
+        "programmer": "./apps/agent/src/graphs/programmer/index.ts:programmerGraph",
+        "reviewer": "./apps/agent/src/graphs/reviewer/index.ts:reviewerGraph"
+    },
+    "env": "./apps/agent/.env",
+    "dependencies": [
+        "./apps/agent"
+    ],
+    "checkpointer": "postgres://postgres:langgraph@localhost:5432/langgraph_checkpoints"
+}
