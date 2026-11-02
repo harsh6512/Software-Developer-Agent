@@ -39,7 +39,7 @@ export class ShellExecutor {
             workdir,
             env,
             timeout
-        );
+        )
 
         return {
             exitCode: response.exitCode,
