@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # PostgreSQL for LangGraph persistence
   postgres:
     image: postgres:15
     container_name: agentic-postgres
@@ -14,7 +15,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d langgraph_checkpoints"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d langgraph_checkpoints" ]
       interval: 10s
       timeout: 5s
       retries: 5
