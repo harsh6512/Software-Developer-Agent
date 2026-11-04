@@ -14,6 +14,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { getModelManager } from "../../../utils/llms/model-manager.js";
 import { daytonaClient, deleteSandbox } from "../../../utils/sandbox.js";
 import { createShellExecutor } from "../../../utils/shell-executor.js";
+import { getGitHubAuthToken } from "../../../utils/github/get-token.js";
 
 const logger = createLogger("OpenPR");
 
@@ -63,9 +64,16 @@ export async function openPullRequest(
     const repoPath = getRepoAbsolutePath(state.targetRepository);
     const { owner, repo } = state.targetRepository;
     const executor = createShellExecutor();
-    const githubToken = process.env.GITHUB_TOKEN;
 
-    /** Runs a command in the repo and throws on non-zero exit. */
+    // 1. Resolve authentication token (supports PAT, GitHub App, or Request Header)
+    let githubToken: string | undefined;
+    try {
+        githubToken = await getGitHubAuthToken(config);
+    } catch (err: any) {
+        logger.warn("No GitHub token resolved:", { message: err.message });
+    }
+
+    /** Runs a command in the repo and throws on non-zero exit with token masking */
     const run = async (command: string, env: Record<string, string> = {}) => {
         const res = await executor.executeCommand({ command, workdir: repoPath, env, sandbox });
         if (res.exitCode !== 0) {
@@ -75,6 +83,7 @@ export async function openPullRequest(
         return res.result;
     };
 
+    // 2. Check for modified files
     const status = await run("git status --porcelain");
     if (!status.trim()) {
         logger.info("No modifications to commit for PR.");
@@ -90,6 +99,7 @@ export async function openPullRequest(
         .map((t) => `- ${t.plan}: ${t.summary || "Done"}`)
         .join("\n");
 
+    // 3. Generate PR Title & Body using LLM Router
     const openPrTool = createOpenPrToolFields();
     let prContent: { title: string; body: string };
     try {
@@ -114,6 +124,7 @@ Generate a professional, accurate Pull Request title and markdown body.`),
         };
     }
 
+    // 4. Commit changes locally in sandbox
     const branch = state.branchName || "agentic/patch";
     const messageB64 = Buffer.from(prContent.title, "utf8").toString("base64");
     await run(`git checkout -B ${shQuote(branch)}`);
@@ -122,10 +133,11 @@ Generate a professional, accurate Pull Request title and markdown body.`),
     let prUrl = `Branch: ${branch} (not pushed)`;
     let pushed = false;
 
+    // 5. Push to GitHub and create Pull Request if token is present
     if (githubToken && owner !== "local") {
         try {
             await run(
-                `git push "https://x-access-token:$GITHUB_TOKEN@github.com/${owner}/${repo}.git" ${shQuote(branch)}`,
+                `git push "https://x-access-token:$GITHUB_TOKEN@github.com/${owner}/${repo}.git" ${shQuote(branch)} --force`,
                 { GITHUB_TOKEN: githubToken },
             );
             pushed = true;
@@ -161,6 +173,7 @@ Generate a professional, accurate Pull Request title and markdown body.`),
         }
     }
 
+    // 6. Cleanup sandbox on successful push
     if (pushed) {
         await safeDeleteSandbox(sandboxId);
     } else {
