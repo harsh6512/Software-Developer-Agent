@@ -10,5 +10,14 @@
     "dependencies": [
         "./apps/agent"
     ],
+    "http": {
+        "app": "./apps/agent/src/routes/app.ts:app",
+        "configurable_headers": {
+            "include": [
+                "x-github-installation-id",
+                "x-github-access-token"
+            ]
+        }
+    },
     "checkpointer": "postgres://postgres:langgraph@localhost:5432/langgraph_checkpoints"
 }
