@@ -7,11 +7,8 @@ import { generateMessage } from "./nodes/generate-message.js";
 import { takeAction } from "./nodes/take-action.js";
 import { generatePlan } from "./nodes/generate-plan.js";
 import { interruptProposedPlan } from "./nodes/proposed-plan.js";
+import { programmerGraph } from "../programmer/index.js";
 
-/**
- * Conditional routing: If the model called exploration tools, execute them.
- * Once the model signals it is done (no tool calls), move to plan generation.
- */
 function routeActionOrPlan(state: GraphState): "take-plan-actions" | "generate-plan" {
     const lastMessage = state.messages[state.messages.length - 1];
     if (isAIMessage(lastMessage) && lastMessage.tool_calls?.length) {
@@ -27,6 +24,7 @@ const workflow = new StateGraph(GraphAnnotation)
     .addNode("take-plan-actions", takeAction)
     .addNode("generate-plan", generatePlan)
     .addNode("interrupt-proposed-plan", interruptProposedPlan)
+    .addNode("programmer-subgraph", programmerGraph)
 
     // Execution Flow
     .addEdge(START, "prepare-graph-state")
@@ -38,7 +36,10 @@ const workflow = new StateGraph(GraphAnnotation)
     ])
     .addEdge("take-plan-actions", "generate-plan-context-action")
     .addEdge("generate-plan", "interrupt-proposed-plan")
-    .addEdge("interrupt-proposed-plan", END);
+
+    // 3. Connect: After approval, transition straight to Programmer!
+    .addEdge("interrupt-proposed-plan", "programmer-subgraph")
+    .addEdge("programmer-subgraph", END);
 
 export const plannerGraph = workflow.compile();
 plannerGraph.name = "Agentic - Planner";
