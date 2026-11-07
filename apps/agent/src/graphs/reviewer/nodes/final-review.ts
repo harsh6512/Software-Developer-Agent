@@ -25,6 +25,7 @@ const finalReviewSchema = z.object({
         .describe("Detailed explanation of the review verdict."),
     additional_tasks: z
         .array(z.string())
+        .nullable()
         .optional()
         .describe("If not approved, list the specific tasks the programmer needs to execute to fix the issues."),
 });
