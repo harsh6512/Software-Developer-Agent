@@ -16,6 +16,7 @@ export async function startPlanner(
         targetRepository: state.targetRepository,
         branchName: state.branchName,
         taskPlan: state.taskPlan,
+        autoAcceptPlan: state.autoAcceptPlan,
     });
 
     return {
