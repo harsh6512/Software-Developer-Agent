@@ -34,6 +34,11 @@ export async function interruptProposedPlan(
         throw new Error("No active plan revision found.");
     }
 
+    if ((state as any).autoAcceptPlan) {
+        logger.info("autoAcceptPlan is true, automatically approving plan without interrupt.");
+        return {};
+    }
+
     logger.info(
         "Interrupting execution for Human-in-the-Loop plan approval...",
     );

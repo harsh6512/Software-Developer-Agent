@@ -140,6 +140,12 @@ export const GraphAnnotation = Annotation.Root({
     customRules: Annotation<CustomRules | undefined>({
         reducer: (_prev, next) => next,
     }),
+
+    // Whether to auto-accept the plan (skip human-in-the-loop approval)
+    autoAcceptPlan: Annotation<boolean | undefined>({
+        reducer: (_prev, next) => next,
+        default: () => false,
+    }),
 });
 
 // Configuration options passed into graph nodes and tools via LangGraph
