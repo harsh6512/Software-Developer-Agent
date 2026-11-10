@@ -1,10 +1,23 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { getInstallationAccessToken, verifyRepositoryAccess } from "../utils/github/app-auth.js";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import {
+    GITHUB_TOKEN_COOKIE,
+    GITHUB_TOKEN_TYPE_COOKIE,
+    GITHUB_INSTALLATION_ID_COOKIE,
+    GITHUB_AUTH_STATE_COOKIE,
+} from "@agentic/shared";
+import {
+    verifyRepositoryAccess,
+    verifyGithubUser,
+} from "../utils/github/app-auth.js";
 
 export const app = new Hono();
 
-// Enable CORS for your React + Vite frontend (typically localhost:5173 in dev)
+const isProduction = process.env.NODE_ENV === "production";
+const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+// Configure CORS for the React frontend.
 app.use(
     "*",
     cors({
@@ -13,44 +26,250 @@ app.use(
     }),
 );
 
-/**
- * Route 1: GitHub App Installation Callback
- * GitHub redirects user here after they install the App on their repo:
- * GET /api/github/installation-callback?installation_id=123456&setup_action=install
- */
-app.get("/api/github/installation-callback", (c) => {
-    const installationId = c.req.query("installation_id");
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+const sessionCookieOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "Lax" as const,
+    maxAge: 60 * 60 * 24 * 30,
+    path: "/",
+};
 
-    if (!installationId) {
-        return c.redirect(`${frontendUrl}?error=missing_installation_id`);
+const clientCookieOptions = {
+    httpOnly: false,
+    secure: isProduction,
+    sameSite: "Lax" as const,
+    maxAge: 60 * 60 * 24 * 30,
+    path: "/",
+};
+
+// Initiate GitHub OAuth login.
+app.get("/api/auth/github/login", (c) => {
+    const clientId = process.env.GITHUB_APP_CLIENT_ID;
+    const redirectUri =
+        process.env.GITHUB_APP_REDIRECT_URI ||
+        "http://localhost:2024/api/auth/github/callback";
+
+    if (!clientId) {
+        return c.json({ error: "GITHUB_APP_CLIENT_ID missing in .env" }, 500);
     }
 
-    // Redirect user back to React frontend with installation_id in URL query
-    return c.redirect(`${frontendUrl}/auth/callback?installation_id=${installationId}`);
+    const state = crypto.randomUUID();
+
+    // Store OAuth state to prevent CSRF attacks.
+    setCookie(c, GITHUB_AUTH_STATE_COOKIE, state, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "Lax",
+        maxAge: 60 * 10,
+        path: "/",
+    });
+
+    const authUrl = new URL("https://github.com/login/oauth/authorize");
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("state", state);
+
+    return c.redirect(authUrl.toString());
 });
 
-/**
- * Route 2: Validate Repository Access
- * React frontend calls this to check if user has installed the App on a specific repo:
- * GET /api/github/check-repo?owner=octocat&repo=Hello-World&installation_id=123456
- */
+// Handle GitHub OAuth callback and exchange the authorization code.
+app.get("/api/auth/github/callback", async (c) => {
+    const code = c.req.query("code");
+    const state = c.req.query("state");
+    const error = c.req.query("error");
+    const installationId = c.req.query("installation_id");
+
+    if (error) {
+        return c.redirect(`${frontendUrl}?error=${encodeURIComponent(error)}`);
+    }
+
+    if (!code) {
+        return c.redirect(`${frontendUrl}?error=missing_code_parameter`);
+    }
+
+    // Verify the OAuth state to prevent CSRF attacks.
+    const storedState = getCookie(c, GITHUB_AUTH_STATE_COOKIE);
+
+    if (!storedState || state !== storedState) {
+        return c.redirect(`${frontendUrl}?error=invalid_state`);
+    }
+
+    const clientId = process.env.GITHUB_APP_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_APP_CLIENT_SECRET;
+    const redirectUri =
+        process.env.GITHUB_APP_REDIRECT_URI ||
+        "http://localhost:2024/api/auth/github/callback";
+
+    const tokenResponse = await fetch(
+        "https://github.com/login/oauth/access_token",
+        {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                client_id: clientId,
+                client_secret: clientSecret,
+                code,
+                redirect_uri: redirectUri,
+            }),
+        },
+    );
+
+    const tokenData = (await tokenResponse.json()) as {
+        access_token?: string;
+        token_type?: string;
+        error?: string;
+    };
+
+    if (tokenData.error || !tokenData.access_token) {
+        return c.redirect(
+            `${frontendUrl}?error=${encodeURIComponent(
+                tokenData.error || "token_exchange_failed",
+            )}`,
+        );
+    }
+
+    deleteCookie(c, GITHUB_AUTH_STATE_COOKIE, { path: "/" });
+
+    setCookie(c, GITHUB_TOKEN_COOKIE, tokenData.access_token, sessionCookieOptions);
+    setCookie(
+        c,
+        GITHUB_TOKEN_TYPE_COOKIE,
+        tokenData.token_type || "bearer",
+        sessionCookieOptions,
+    );
+
+    if (installationId) {
+        setCookie(c, GITHUB_INSTALLATION_ID_COOKIE, installationId, clientCookieOptions);
+    }
+
+    return c.redirect(`${frontendUrl}/`);
+});
+
+// Handle GitHub App installation callback.
+app.get("/api/github/installation-callback", (c) => {
+    const installationId = c.req.query("installation_id");
+
+    if (installationId) {
+        setCookie(c, GITHUB_INSTALLATION_ID_COOKIE, installationId, clientCookieOptions);
+    }
+
+    return c.redirect(`${frontendUrl}/`);
+});
+
+// Return the authenticated GitHub user profile.
+app.get("/api/auth/user", async (c) => {
+    const accessToken = getCookie(c, GITHUB_TOKEN_COOKIE);
+
+    if (!accessToken) {
+        return c.json({ error: "Not authenticated" }, 401);
+    }
+
+    const user = await verifyGithubUser(accessToken);
+
+    if (!user) {
+        return c.json({ error: "Invalid GitHub token" }, 401);
+    }
+
+    return c.json({
+        user: {
+            login: user.login,
+            avatar_url: user.avatar_url,
+            name: user.name,
+            email: user.email,
+        },
+    });
+});
+
+// Return all GitHub App installations for the authenticated user.
+app.get("/api/github/installations", async (c) => {
+    const accessToken = getCookie(c, GITHUB_TOKEN_COOKIE);
+    const tokenType = getCookie(c, GITHUB_TOKEN_TYPE_COOKIE) || "Bearer";
+
+    if (!accessToken) {
+        return c.json({ error: "GitHub access token not found" }, 401);
+    }
+
+    const response = await fetch("https://api.github.com/user/installations", {
+        headers: {
+            Authorization: `${tokenType} ${accessToken}`,
+            Accept: "application/vnd.github.v3+json",
+            "User-Agent": "Agentic-SWE-Agent",
+        },
+    });
+
+    if (!response.ok) {
+        return c.json(
+            { error: "Failed to fetch installations from GitHub" },
+            response.status as any,
+        );
+    }
+
+    const data = (await response.json()) as { installations: any[] };
+
+    const installations = data.installations.map((inst) => ({
+        id: inst.id,
+        accountName: inst.account?.login || inst.account?.name || "Unknown",
+        accountType: inst.target_type,
+        avatarUrl: inst.account?.avatar_url,
+    }));
+
+    return c.json({ installations });
+});
+
+// Switch the active GitHub App installation.
+app.post("/api/github/switch-installation", async (c) => {
+    const body = await c.req.json();
+    const { installationId } = body;
+
+    if (!installationId) {
+        return c.json({ error: "Installation ID is required" }, 400);
+    }
+
+    setCookie(
+        c,
+        GITHUB_INSTALLATION_ID_COOKIE,
+        String(installationId),
+        clientCookieOptions,
+    );
+
+    return c.json({ success: true, installationId });
+});
+
+// Handle installation access token generation for Git and Daytona.
+
+// Log out the user and clear authentication cookies.
+app.post("/api/auth/logout", (c) => {
+    deleteCookie(c, GITHUB_TOKEN_COOKIE, { path: "/" });
+    deleteCookie(c, GITHUB_TOKEN_TYPE_COOKIE, { path: "/" });
+    deleteCookie(c, GITHUB_INSTALLATION_ID_COOKIE, { path: "/" });
+
+    return c.json({ success: true });
+});
+
+// Verify repository access for a GitHub App installation.
 app.get("/api/github/check-repo", async (c) => {
     const owner = c.req.query("owner");
     const repo = c.req.query("repo");
-    const installationId = c.req.query("installation_id");
+    const installationId =
+        c.req.query("installation_id") ||
+        getCookie(c, GITHUB_INSTALLATION_ID_COOKIE);
 
     if (!owner || !repo || !installationId) {
-        return c.json({ error: "Missing required parameters (owner, repo, installation_id)" }, 400);
+        return c.json(
+            { error: "Missing owner, repo, or installation_id" },
+            400,
+        );
     }
 
     const hasAccess = await verifyRepositoryAccess(installationId, owner, repo);
+
     return c.json({ hasAccess });
 });
 
-/**
- * Route 3: Test Health endpoint
- */
+// Check backend health.
 app.get("/api/health", (c) => {
     return c.json({ status: "healthy", timestamp: Date.now() });
 });
