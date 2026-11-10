@@ -10,6 +10,7 @@ import {
 import {
     verifyRepositoryAccess,
     verifyGithubUser,
+    getInstallationAccessToken,
 } from "../utils/github/app-auth.js";
 
 export const app = new Hono();
@@ -173,6 +174,8 @@ app.get("/api/auth/user", async (c) => {
         return c.json({ error: "Invalid GitHub token" }, 401);
     }
 
+    const activeInstallationId = getCookie(c, GITHUB_INSTALLATION_ID_COOKIE);
+
     return c.json({
         user: {
             login: user.login,
@@ -180,6 +183,7 @@ app.get("/api/auth/user", async (c) => {
             name: user.name,
             email: user.email,
         },
+        activeInstallationId: activeInstallationId || null,
     });
 });
 
@@ -217,6 +221,80 @@ app.get("/api/github/installations", async (c) => {
     }));
 
     return c.json({ installations });
+});
+
+// Return GitHub App metadata and direct install link.
+app.get("/api/github/app-info", (c) => {
+    return c.json({
+        appSlug: "software-developer-agent",
+        installUrl: "https://github.com/apps/software-developer-agent/installations/new",
+    });
+});
+
+// Return all repositories accessible for a specific installation.
+app.get("/api/github/installations/:id/repos", async (c) => {
+    const accessToken = getCookie(c, GITHUB_TOKEN_COOKIE);
+    const tokenType = getCookie(c, GITHUB_TOKEN_TYPE_COOKIE) || "Bearer";
+    const installationId = c.req.param("id");
+
+    try {
+        let repositories: any[] = [];
+
+        // 1. Try with user's OAuth access token first
+        if (accessToken) {
+            const response = await fetch(
+                `https://api.github.com/user/installations/${installationId}/repositories?per_page=100`,
+                {
+                    headers: {
+                        Authorization: `${tokenType} ${accessToken}`,
+                        Accept: "application/vnd.github.v3+json",
+                        "User-Agent": "Agentic-SWE-Agent",
+                    },
+                },
+            );
+
+            if (response.ok) {
+                const data = (await response.json()) as { repositories?: any[] };
+                repositories = data.repositories || [];
+            }
+        }
+
+        // 2. Fallback: Query directly with GitHub App installation access token
+        if (repositories.length === 0 && installationId) {
+            try {
+                const appToken = await getInstallationAccessToken(installationId);
+                const response = await fetch(
+                    `https://api.github.com/installation/repositories?per_page=100`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${appToken}`,
+                            Accept: "application/vnd.github.v3+json",
+                            "User-Agent": "Agentic-SWE-Agent",
+                        },
+                    },
+                );
+                if (response.ok) {
+                    const data = (await response.json()) as { repositories?: any[] };
+                    repositories = data.repositories || [];
+                }
+            } catch (err: any) {
+                console.warn("Fallback to installation token failed:", err.message);
+            }
+        }
+
+        const formatted = repositories.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            fullName: r.full_name,
+            owner: r.owner?.login || "",
+            defaultBranch: r.default_branch || "main",
+            private: !!r.private,
+        }));
+
+        return c.json({ repositories: formatted });
+    } catch (err: any) {
+        return c.json({ error: err.message || "Failed to fetch repositories" }, 500);
+    }
 });
 
 // Switch the active GitHub App installation.
