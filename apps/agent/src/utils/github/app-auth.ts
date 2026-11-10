@@ -58,7 +58,7 @@ export async function getInstallationAccessToken(installationId: string | number
 }
 
 /**
- * 3. Verifies if an installation ID has access to a specific target repository (owner/repo).
+ * 3. Verifies if an installation ID has access to a target repository.
  */
 export async function verifyRepositoryAccess(
     installationId: string | number,
@@ -70,7 +70,21 @@ export async function verifyRepositoryAccess(
         const octokit = new Octokit({ auth: token });
         const { data } = await octokit.rest.repos.get({ owner, repo });
         return !!data;
-    } catch (err: any) {
+    } catch {
         return false;
+    }
+}
+
+/**
+ * 4. Verifies a user's OAuth access token and returns their profile.
+ */
+export async function verifyGithubUser(accessToken: string) {
+    if (!accessToken) return null;
+    try {
+        const octokit = new Octokit({ auth: accessToken });
+        const { data: user } = await octokit.rest.users.getAuthenticated();
+        return user;
+    } catch {
+        return null;
     }
 }
