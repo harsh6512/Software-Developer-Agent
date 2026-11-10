@@ -1,29 +1,31 @@
 import { Client } from "@langchain/langgraph-sdk";
 
-const DEFAULT_SERVER_URL = "http://localhost:2024";
+export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:2024";
 
-export function getStoredPat(): string {
-    return localStorage.getItem("github_pat") || "";
+/**
+ * Read a cookie value by name from document.cookie.
+ */
+export function getCookie(name: string): string | null {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : null;
 }
 
-export function setStoredPat(pat: string): void {
-    localStorage.setItem("github_pat", pat);
-}
+/**
+ * Creates a configured LangGraph SDK Client.
+ * All credentials (OAuth tokens, session cookies) are stored in HTTP cookies.
+ * The active GitHub installation ID is retrieved from the cookie or passed explicitly.
+ */
+export function createLangGraphClient(installationId?: string | number): Client {
+    const activeInstallationId = installationId || getCookie("github_installation_id");
 
-export function getStoredApiUrl(): string {
-    return localStorage.getItem("langgraph_api_url") || DEFAULT_SERVER_URL;
-}
-
-export function setStoredApiUrl(url: string): void {
-    localStorage.setItem("langgraph_api_url", url);
-}
-
-export function createLangGraphClient(): Client {
-    const pat = getStoredPat();
-    const apiUrl = getStoredApiUrl();
+    const headers: Record<string, string> = {};
+    if (activeInstallationId) {
+        headers["x-github-installation-id"] = String(activeInstallationId);
+    }
 
     return new Client({
-        apiUrl,
-        defaultHeaders: pat ? { "x-github-pat": pat } : undefined,
+        apiUrl: API_URL,
+        defaultHeaders: Object.keys(headers).length > 0 ? headers : undefined,
     });
 }
