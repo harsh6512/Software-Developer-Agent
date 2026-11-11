@@ -10,14 +10,20 @@ export async function startPlanner(
 ): Promise<ManagerGraphUpdate> {
     logger.info("Starting Planner Graph from Web Request...");
 
-    const plannerOutput = await plannerGraph.invoke({
-        messages: state.messages,
-        internalMessages: state.messages,
-        targetRepository: state.targetRepository,
-        branchName: state.branchName,
-        taskPlan: state.taskPlan,
-        autoAcceptPlan: state.autoAcceptPlan,
-    });
+    const plannerOutput = await plannerGraph.invoke(
+        {
+            messages: state.messages,
+            internalMessages: state.messages,
+            targetRepository: state.targetRepository,
+            branchName: state.branchName,
+            taskPlan: state.taskPlan,
+            autoAcceptPlan: state.autoAcceptPlan,
+        },
+        {
+            ..._config,
+            recursionLimit: 200,
+        },
+    );
 
     return {
         messages: plannerOutput.messages,
