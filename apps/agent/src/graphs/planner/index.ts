@@ -22,7 +22,7 @@ const workflow = new StateGraph(GraphAnnotation)
     .addNode("initialize-sandbox", initializeSandbox)
     .addNode("generate-plan-context-action", generateMessage)
     .addNode("take-plan-actions", takeAction)
-    .addNode("generate-plan", generatePlan)
+    .addNode("generate-plan", generatePlan, { ends: ["interrupt-proposed-plan", END] })
     .addNode("interrupt-proposed-plan", interruptProposedPlan)
     .addNode("programmer-subgraph", programmerGraph)
 
@@ -35,7 +35,7 @@ const workflow = new StateGraph(GraphAnnotation)
         "generate-plan",
     ])
     .addEdge("take-plan-actions", "generate-plan-context-action")
-    .addNode("generate-plan", generatePlan, { ends: ["interrupt-proposed-plan", END] })
+    .addEdge("generate-plan", "interrupt-proposed-plan")
 
     // 3. Connect: After approval, transition straight to Programmer!
     .addEdge("interrupt-proposed-plan", "programmer-subgraph")
