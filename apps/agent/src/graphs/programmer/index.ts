@@ -110,5 +110,7 @@ const workflow = new StateGraph(GraphAnnotation)
     .addEdge("generate-conclusion", "open-pr")
     .addEdge("open-pr", END)
 
-export const programmerGraph = workflow.compile();
+const compiled = workflow.compile();
+compiled.name = "Agentic Programmer";
+export const programmerGraph = compiled.withConfig({ recursionLimit: 200 });
 programmerGraph.name = "Agentic Programmer";

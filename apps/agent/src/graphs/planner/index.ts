@@ -41,5 +41,7 @@ const workflow = new StateGraph(GraphAnnotation)
     .addEdge("interrupt-proposed-plan", "programmer-subgraph")
     .addEdge("programmer-subgraph", END);
 
-export const plannerGraph = workflow.compile();
+const compiled = workflow.compile();
+compiled.name = "Agentic - Planner";
+export const plannerGraph = compiled.withConfig({ recursionLimit: 200 });
 plannerGraph.name = "Agentic - Planner";
