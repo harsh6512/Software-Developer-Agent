@@ -83,13 +83,34 @@ export async function openPullRequest(
         return res.result;
     };
 
-    // 2. Check for modified files
-    const status = await run("git status --porcelain");
-    if (!status.trim()) {
-        logger.info("No modifications to commit for PR.");
-        await safeDeleteSandbox(sandboxId);
-        return {};
+    // 2. Verify whether there are any changed files compared to base branch
+    const baseBranch = state.targetRepository.branch || "main";
+    let gitDiffNames = "";
+    try {
+        gitDiffNames = await run(`git diff --name-only ${shQuote(baseBranch)}`);
+    } catch {
+        // Fallback if baseBranch isn't checked out locally
+        gitDiffNames = "";
     }
+    const status = await run("git status --porcelain");
+
+    // If both git diff against base branch and git status are empty, skip PR
+    if (!gitDiffNames.trim() && !status.trim()) {
+        logger.info("No modifications or diff detected compared to base branch. Skipping PR creation.");
+        await safeDeleteSandbox(sandboxId);
+
+        const noChangesMsg = new AIMessage({
+            content: `The requested task is already satisfied in the repository. No code modifications were needed, so no Pull Request was opened.`,
+        });
+
+        return {
+            messages: [noChangesMsg],
+            internalMessages: [noChangesMsg],
+            sandboxSessionId: undefined,
+        };
+    }
+
+    // 3. Stage changes and collect diff statistics
     await run("git add -A");
     const diffStat = (await run("git diff --cached --stat")).slice(0, 4000);
 
@@ -99,7 +120,7 @@ export async function openPullRequest(
         .map((t) => `- ${t.plan}: ${t.summary || "Done"}`)
         .join("\n");
 
-    // 3. Generate PR Title & Body using LLM Router
+    // 4. Generate PR Title & Body using LLM Router
     const openPrTool = createOpenPrToolFields();
     let prContent: { title: string; body: string };
     try {
@@ -124,7 +145,7 @@ Generate a professional, accurate Pull Request title and markdown body.`),
         };
     }
 
-    // 4. Commit changes locally in sandbox
+    // 5. Commit changes locally in sandbox
     const branch = state.branchName || "agentic/patch";
     const messageB64 = Buffer.from(prContent.title, "utf8").toString("base64");
     await run(`git checkout -B ${shQuote(branch)}`);
@@ -133,7 +154,7 @@ Generate a professional, accurate Pull Request title and markdown body.`),
     let prUrl = `Branch: ${branch} (not pushed)`;
     let pushed = false;
 
-    // 5. Push to GitHub and create Pull Request if token is present
+    // 6. Push to GitHub and create Pull Request if token is present
     if (githubToken && owner !== "local") {
         try {
             await run(
@@ -173,7 +194,7 @@ Generate a professional, accurate Pull Request title and markdown body.`),
         }
     }
 
-    // 6. Cleanup sandbox on successful push
+    // 7. Cleanup sandbox on successful push
     if (pushed) {
         await safeDeleteSandbox(sandboxId);
     } else {
@@ -187,5 +208,6 @@ Generate a professional, accurate Pull Request title and markdown body.`),
     return {
         messages: [finalMsg],
         internalMessages: [finalMsg],
+        sandboxSessionId: pushed ? undefined : sandboxId,
     };
 }
