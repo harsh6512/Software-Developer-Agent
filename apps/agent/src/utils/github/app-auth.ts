@@ -6,7 +6,7 @@ function convertEscapedNewlines(str: string): string {
 }
 
 /**
- * 1. Generates a signed JWT using your GitHub App ID & Private Key.
+ * Generates a signed JWT using your GitHub App ID & Private Key.
  * Valid for 9 minutes (max allowed by GitHub is 10 min).
  */
 export function generateAppJWT(): string {
@@ -30,7 +30,7 @@ export function generateAppJWT(): string {
 }
 
 /**
- * 2. Mints an ephemeral installation access token (valid for 1 hour)
+ * Mints an ephemeral installation access token (valid for 1 hour)
  * for a specific user's installation_id.
  */
 export async function getInstallationAccessToken(installationId: string | number): Promise<string> {
@@ -58,7 +58,7 @@ export async function getInstallationAccessToken(installationId: string | number
 }
 
 /**
- * 3. Verifies if an installation ID has access to a target repository.
+ * Verifies if an installation ID has access to a target repository.
  */
 export async function verifyRepositoryAccess(
     installationId: string | number,
@@ -76,7 +76,7 @@ export async function verifyRepositoryAccess(
 }
 
 /**
- * 4. Verifies a user's OAuth access token and returns their profile.
+ * Verifies a user's OAuth access token and returns their profile.
  */
 export async function verifyGithubUser(accessToken: string) {
     if (!accessToken) return null;
