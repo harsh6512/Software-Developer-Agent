@@ -259,6 +259,17 @@ export function createSessionPlanToolFields() {
             .describe(
                 "A short, one-sentence description of the user request and the plan to fulfill it.",
             ),
+        requires_code_changes: z
+            .boolean()
+            .describe(
+                "true if the request needs files modified, created or deleted, or a PR opened. " +
+                "false ONLY if the user explicitly asked for read-only inspection, explanation or a question. " +
+                "If unsure, use true.",
+            ),
+        answer: z
+            .string()
+            .optional()
+            .describe("Required when requires_code_changes is false: the full findings/answer for the user."),
         plan: z
             .array(z.string())
             .describe(

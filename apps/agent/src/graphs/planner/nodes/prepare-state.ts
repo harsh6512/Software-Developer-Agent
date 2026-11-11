@@ -16,5 +16,10 @@ export async function prepareState(state: GraphState): Promise<GraphUpdate> {
         logger.info(`Generated working branch: ${updates.branchName}`);
     }
 
+    // Initialize internal working messages with initial messages if not already set
+    if (!state.internalMessages || state.internalMessages.length === 0) {
+        updates.internalMessages = state.messages;
+    }
+
     return updates;
 }

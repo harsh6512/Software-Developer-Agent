@@ -35,7 +35,7 @@ const workflow = new StateGraph(GraphAnnotation)
         "generate-plan",
     ])
     .addEdge("take-plan-actions", "generate-plan-context-action")
-    .addEdge("generate-plan", "interrupt-proposed-plan")
+    .addNode("generate-plan", generatePlan, { ends: ["interrupt-proposed-plan", END] })
 
     // 3. Connect: After approval, transition straight to Programmer!
     .addEdge("interrupt-proposed-plan", "programmer-subgraph")
