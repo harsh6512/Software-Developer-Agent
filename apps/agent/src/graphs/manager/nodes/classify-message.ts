@@ -10,10 +10,16 @@ const logger = createLogger("ClassifyMessage");
 const classificationSchema = z.object({
     action: z
         .enum(["plan", "reply"])
-        .describe("'plan' if this is a software development, bugfix, or feature request. 'reply' if it is a general question or greeting."),
+        .describe(
+            "'plan' if this requires repository changes, bugfixes, or feature implementation. 'reply' for greetings, general questions, or chat."
+        ),
     response: z
         .string()
-        .describe("The conversational response to send to the user. For 'reply', answer the question. For 'plan', explain that you are starting the planning phase."),
+        .optional()
+        .nullable()
+        .describe(
+            "Only populated for 'reply': Direct, helpful conversational response to the user. Do NOT populate for 'plan'."
+        ),
 });
 
 type ClassificationOutput = z.infer<typeof classificationSchema>;
@@ -33,10 +39,11 @@ export async function classifyMessage(
     const structuredModel = (model as BaseChatModel).withStructuredOutput(classificationSchema);
 
     const prompt = `<identity>
-You are the Supervisor Router for an Autonomous Software Developer Agent.
-Classify the user's message:
-- 'plan': If the user asks to write code, fix a bug, build a feature, inspect a repo, or implement changes.
-- 'reply': If the user is saying hello, asking a general programming question, or needs clarification without repository changes.
+You are the Router for an Autonomous Software Developer Agent.
+Determine whether the user's message requires inspecting and modifying a code repository, or if it is purely conversational / general QA.
+
+- 'plan': User wants to implement a feature, fix a bug, write tests, refactor, or make changes to the repository. (Do not write any plan or code here; the planner will inspect the real repository).
+- 'reply': User is saying hello, asking a standalone conceptual question, or chatting without requiring repository work. Provide a direct, helpful response in 'response'.
 </identity>`;
 
     const rawResult = await structuredModel.invoke([
@@ -47,17 +54,17 @@ Classify the user's message:
 
     logger.info("Message classified", { action: result.action });
 
-    const replyMsg = new AIMessage(result.response);
-
     if (result.action === "reply") {
+        const replyText = result.response || "How can I help you with your repository today?";
         return {
-            messages: [replyMsg],
+            messages: [new AIMessage(replyText)],
             nextRoute: "reply",
         };
     }
 
+    // For 'plan', do NOT emit hallucinated pre-inspection messages.
+    // The planner will clone the repository, explore actual files, and build the real plan.
     return {
-        messages: [replyMsg],
         nextRoute: "start-planner",
     };
 }

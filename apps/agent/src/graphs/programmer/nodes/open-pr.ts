@@ -201,8 +201,11 @@ Generate a professional, accurate Pull Request title and markdown body.`),
         logger.warn("Keeping sandbox because changes were not pushed.", { sandboxId });
     }
 
+    const cleanTitle = (prContent.title || "").replace(/\*\*/g, "").trim();
+    const cleanBody = (prContent.body || "").trim();
+
     const finalMsg = new AIMessage({
-        content: `🎉 **Task Complete!**\n\n**Pull Request:** ${prUrl}\n\n**Title:** ${prContent.title}\n\n${prContent.body}`,
+        content: `🎉 **Task Complete!**\n\n**Pull Request:** ${prUrl}\n\n**Title:** ${cleanTitle}\n\n${cleanBody}`,
     });
 
     return {
