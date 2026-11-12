@@ -14,24 +14,27 @@ export async function interruptProposedPlan(
 ): Promise<GraphUpdate> {
     const taskPlan = state.taskPlan;
 
-    if (!taskPlan) {
-        throw new Error("No task plan found in graph state.");
+    if (!taskPlan || !taskPlan.tasks || taskPlan.tasks.length === 0) {
+        logger.info("No task plan found in graph state. Skipping plan approval interrupt.");
+        return {};
     }
 
     const currentTask =
-        taskPlan.tasks[taskPlan.activeTaskIndex];
+        taskPlan.tasks[taskPlan.activeTaskIndex] || taskPlan.tasks[0];
 
     if (!currentTask) {
-        throw new Error("No active task found in task plan.");
+        logger.info("No active task found in task plan. Skipping plan approval interrupt.");
+        return {};
     }
 
     const activeRevision =
-        currentTask.planRevisions[
+        currentTask.planRevisions?.[
         currentTask.activeRevisionIndex
-        ];
+        ] || currentTask.planRevisions?.[0];
 
     if (!activeRevision) {
-        throw new Error("No active plan revision found.");
+        logger.info("No active plan revision found. Skipping plan approval interrupt.");
+        return {};
     }
 
     if ((state as any).autoAcceptPlan) {

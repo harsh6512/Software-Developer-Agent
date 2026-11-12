@@ -17,6 +17,13 @@ function routeActionOrPlan(state: GraphState): "take-plan-actions" | "generate-p
     return "generate-plan";
 }
 
+function routeAfterInterrupt(state: GraphState): "programmer-subgraph" | typeof END {
+    if (state.taskPlan && state.taskPlan.tasks && state.taskPlan.tasks.length > 0) {
+        return "programmer-subgraph";
+    }
+    return END;
+}
+
 const workflow = new StateGraph(GraphAnnotation)
     .addNode("prepare-graph-state", prepareState)
     .addNode("initialize-sandbox", initializeSandbox)
@@ -35,10 +42,12 @@ const workflow = new StateGraph(GraphAnnotation)
         "generate-plan",
     ])
     .addEdge("take-plan-actions", "generate-plan-context-action")
-    .addEdge("generate-plan", "interrupt-proposed-plan")
 
-    // 3. Connect: After approval, transition straight to Programmer!
-    .addEdge("interrupt-proposed-plan", "programmer-subgraph")
+    // 3. Connect: After approval, transition to Programmer if a plan exists, or END if no code changes
+    .addConditionalEdges("interrupt-proposed-plan", routeAfterInterrupt, [
+        "programmer-subgraph",
+        END,
+    ])
     .addEdge("programmer-subgraph", END);
 
 const compiled = workflow.compile();
