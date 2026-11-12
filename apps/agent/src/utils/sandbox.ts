@@ -1,4 +1,4 @@
-import { Daytona, Sandbox, SandboxState } from "@daytonaio/sdk";
+import { Daytona, Sandbox } from "@daytonaio/sdk";
 import { TargetRepository } from "@agentic/shared";
 import { createLogger } from "./logger.js";
 import { DEFAULT_SANDBOX_CREATE_PARAMS, DEFAULT_SANDBOX_IMAGE_PARAMS } from "../constants.js"
@@ -18,17 +18,16 @@ export function daytonaClient(): Daytona {
 }
 
 /**
- * Creates a new Daytona sandbox workspace.
- * Tries the snapshot first, with graceful fallback to standard image.
+ * Creates a new Daytona sandbox workspace using the verified base container image.
  */
 export async function createSandbox(): Promise<Sandbox> {
   logger.info("Creating new Daytona sandbox...");
   let sandbox: Sandbox;
   try {
-    sandbox = await daytonaClient().create(DEFAULT_SANDBOX_CREATE_PARAMS, { timeout: 100 });
-  } catch (err) {
-    logger.warn("Failed with snapshot params, falling back to base image params...", { err });
     sandbox = await daytonaClient().create(DEFAULT_SANDBOX_IMAGE_PARAMS, { timeout: 120 });
+  } catch (err) {
+    logger.warn("Primary image creation failed, trying fallback...", { err });
+    sandbox = await daytonaClient().create(DEFAULT_SANDBOX_CREATE_PARAMS, { timeout: 120 });
   }
 
   // Dynamically wait until live (usually 2-4 seconds, zero wasted time)
@@ -109,72 +108,70 @@ export async function getSandboxWithErrorHandling(
   codebaseTree: string | null;
   dependenciesInstalled: boolean;
 }> {
-  try {
-    if (!sandboxSessionId) {
-      throw new Error("No sandbox ID provided.");
-    }
+  if (sandboxSessionId) {
+    try {
+      logger.info("Getting existing sandbox session...", { sandboxSessionId });
+      const sandbox = await daytonaClient().get(sandboxSessionId);
+      const state = sandbox.state;
 
-    logger.info("Getting existing sandbox session...", { sandboxSessionId });
-    const sandbox = await daytonaClient().get(sandboxSessionId);
-    const state = sandbox.state;
-
-    if (state === "started") {
-      return {
-        sandbox,
-        codebaseTree: null,
-        dependenciesInstalled: false,
-      };
-    }
-
-    if (state === "stopped" || state === "archived") {
-      logger.info(`Sandbox ${sandboxSessionId} is ${state}. Starting it...`);
-      await sandbox.start();
-      await waitForSandboxReady(sandbox);
-      return {
-        sandbox,
-        codebaseTree: null,
-        dependenciesInstalled: false,
-      };
-    }
-
-    throw new Error(`Sandbox in unrecoverable state: ${state}`);
-  } catch (error) {
-    logger.info("Provisioning fresh sandbox (due to missing ID, unrecoverable state, or error)...");
-
-    let sandbox: Sandbox | null = null;
-    let attempts = 0;
-    while (!sandbox && attempts < 3) {
-      try {
-        sandbox = await createSandbox();
-      } catch (err) {
-        attempts++;
-        logger.warn(`Sandbox creation attempt ${attempts} failed. Retrying...`);
+      if (state === "started") {
+        return {
+          sandbox,
+          codebaseTree: null,
+          dependenciesInstalled: false,
+        };
       }
+
+      if (state === "stopped" || state === "archived") {
+        logger.info(`Sandbox ${sandboxSessionId} is ${state}. Starting it...`);
+        await sandbox.start();
+        await waitForSandboxReady(sandbox);
+        return {
+          sandbox,
+          codebaseTree: null,
+          dependenciesInstalled: false,
+        };
+      }
+    } catch (err) {
+      logger.warn(`Existing sandbox session ${sandboxSessionId} could not be reused. Re-provisioning...`);
     }
-
-    if (!sandbox) {
-      throw new Error("Failed to create sandbox after 3 attempts");
-    }
-
-    // Clone the target repository into /home/daytona
-    await cloneRepo(sandbox, targetRepository, {
-      githubInstallationToken: options.githubInstallationToken,
-      stateBranchName: branchName,
-    });
-
-    // Generate the initial directory file tree
-    const tree = await getCodebaseTree(sandbox, targetRepository);
-    const codebaseTree = tree === FAILED_TO_GENERATE_TREE_MESSAGE ? null : tree;
-
-    logger.info("Sandbox and repository setup completed successfully", {
-      sandboxId: sandbox.id,
-      hasTree: !!codebaseTree,
-    });
-
-    return {
-      sandbox,
-      codebaseTree,
-      dependenciesInstalled: false,
-    };
   }
+
+  logger.info("Provisioning fresh sandbox workspace...");
+
+  let sandbox: Sandbox | null = null;
+  let attempts = 0;
+  while (!sandbox && attempts < 3) {
+    try {
+      sandbox = await createSandbox();
+    } catch (err) {
+      attempts++;
+      logger.warn(`Sandbox creation attempt ${attempts} failed. Retrying...`);
+    }
+  }
+
+  if (!sandbox) {
+    throw new Error("Failed to create sandbox after 3 attempts");
+  }
+
+  // Clone the target repository into /home/daytona
+  await cloneRepo(sandbox, targetRepository, {
+    githubInstallationToken: options.githubInstallationToken,
+    stateBranchName: branchName,
+  });
+
+  // Generate the initial directory file tree
+  const tree = await getCodebaseTree(sandbox, targetRepository);
+  const codebaseTree = tree === FAILED_TO_GENERATE_TREE_MESSAGE ? null : tree;
+
+  logger.info("Sandbox and repository setup completed successfully", {
+    sandboxId: sandbox.id,
+    hasTree: !!codebaseTree,
+  });
+
+  return {
+    sandbox,
+    codebaseTree,
+    dependenciesInstalled: false,
+  };
 }
