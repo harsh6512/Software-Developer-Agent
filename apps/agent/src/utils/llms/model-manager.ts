@@ -6,8 +6,7 @@ import { createLogger } from "../logger.js";
 const logger = createLogger("ModelManager");
 
 export const PROVIDER_FALLBACK_ORDER = [
-    "groq",
-    "openrouter",
+    "nvidia",
     "google-genai",
     "anthropic",
     "openai",
@@ -32,11 +31,8 @@ export class ModelManager {
         // 1. Check configurable if passed from frontend session
         const apiKeys = (graphConfig?.configurable as any)?.apiKeys;
         if (apiKeys) {
-            if (provider === "groq" && (apiKeys.groqApiKey || apiKeys.groq_api_key)) {
-                return apiKeys.groqApiKey || apiKeys.groq_api_key;
-            }
-            if (provider === "openrouter" && (apiKeys.openrouterApiKey || apiKeys.openRouterApiKey)) {
-                return apiKeys.openrouterApiKey || apiKeys.openRouterApiKey;
+            if (provider === "nvidia" && (apiKeys.nvidiaApiKey || apiKeys.nvidia_api_key)) {
+                return apiKeys.nvidiaApiKey || apiKeys.nvidia_api_key;
             }
             if (provider === "google-genai" && apiKeys.googleApiKey) return apiKeys.googleApiKey;
             if (provider === "anthropic" && apiKeys.anthropicApiKey) return apiKeys.anthropicApiKey;
@@ -44,11 +40,8 @@ export class ModelManager {
         }
 
         // 2. Fall back to environment variables
-        if (provider === "groq") {
-            return process.env.GROQ_API_KEY;
-        }
-        if (provider === "openrouter") {
-            return process.env.OPENROUTER_API_KEY;
+        if (provider === "nvidia") {
+            return process.env.NVIDIA_API_KEY;
         }
         if (provider === "google-genai") {
             return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -70,10 +63,7 @@ export class ModelManager {
         graphConfig?: GraphConfig,
         task?: LLMTask,
     ): ModelLoadConfig {
-        const defaultModel =
-            process.env.OPENROUTER_API_KEY && !process.env.GEMINI_API_KEY
-                ? "openrouter:openrouter/free"
-                : "google-genai:gemini-3.8-flash";
+        const defaultModel = "nvidia:nvidia/nemotron-3.5-super-vl-120b-a12b";
 
         const taskDefaults = task ? TASK_TO_CONFIG_DEFAULTS_MAP[task] : {
             modelName: defaultModel,
@@ -87,34 +77,23 @@ export class ModelManager {
         const envModel =
             taskEnvModel ||
             process.env.MODEL_NAME ||
-            (process.env.OPENROUTER_MODEL
-                ? (process.env.OPENROUTER_MODEL.includes(":")
-                    ? process.env.OPENROUTER_MODEL.trim()
-                    : `openrouter:${process.env.OPENROUTER_MODEL.trim()}`)
-                : undefined) ||
-            (process.env.GEMINI_MODEL ? `google-genai:${process.env.GEMINI_MODEL.trim()}` : undefined) ||
-            (process.env.GROQ_MODEL ? `groq:${process.env.GROQ_MODEL.trim()}` : undefined);
+            (process.env.NVIDIA_MODEL ? `nvidia:${process.env.NVIDIA_MODEL.trim()}` : undefined) ||
+            (process.env.GEMINI_MODEL ? `google-genai:${process.env.GEMINI_MODEL.trim()}` : undefined);
 
         const rawConfiguredModel =
             (graphConfig?.configurable as any)?.[`${task}ModelName`] ||
             envModel ||
             taskDefaults.modelName;
 
-        let provider: Provider = "openrouter";
-        let modelName = "openrouter/free";
+        let provider: Provider = "nvidia";
+        let modelName = "nvidia/nemotron-3.5-super-vl-120b-a12b";
 
         if (rawConfiguredModel.includes(":")) {
             const [providerStr, ...modelRest] = rawConfiguredModel.split(":");
-            provider = (providerStr as Provider) || "groq";
-            modelName = modelRest.join(":") || "llama-3.3-70b-versatile";
-        } else if (rawConfiguredModel.startsWith("llama")) {
-            provider = "groq";
-            modelName = rawConfiguredModel;
-        } else if (rawConfiguredModel.startsWith("groq/")) {
-            provider = "groq";
-            modelName = rawConfiguredModel.replace("groq/", "");
-        } else if (rawConfiguredModel.startsWith("openrouter/")) {
-            provider = "openrouter";
+            provider = (providerStr as Provider) || "nvidia";
+            modelName = modelRest.join(":") || "nvidia/nemotron-3.5-super-vl-120b-a12b";
+        } else if (rawConfiguredModel.startsWith("nvidia/") || rawConfiguredModel.startsWith("nemotron")) {
+            provider = "nvidia";
             modelName = rawConfiguredModel;
         } else if (rawConfiguredModel.startsWith("gemini")) {
             provider = "google-genai";
@@ -142,7 +121,7 @@ export class ModelManager {
     }
 
     /**
-     * Initializes the chat model via LangChain universal initChatModel, ChatOpenAI for Groq & OpenRouter
+     * Initializes the chat model via LangChain universal initChatModel or ChatOpenAI
      */
     public async initializeModel(
         config: ModelLoadConfig,
@@ -159,63 +138,7 @@ export class ModelManager {
 
         logger.info(`Initializing model: ${provider}:${modelName}`);
 
-        if (provider === "groq") {
-            const { ChatOpenAI } = await import("@langchain/openai");
-            const primary = new ChatOpenAI({
-                model: modelName,
-                apiKey,
-                temperature,
-                maxTokens,
-                maxRetries: 0,
-                configuration: {
-                    baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
-                },
-            });
-
-            // Groq fallbacks in case developer-tier accounts encounter decommission/404 on llama-3.3-70b-versatile
-            const fallbackQwen = new ChatOpenAI({
-                model: "qwen/qwen3.8-27b",
-                apiKey,
-                temperature,
-                maxTokens,
-                maxRetries: 1,
-                configuration: {
-                    baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
-                },
-            });
-
-            const fallback120b = new ChatOpenAI({
-                model: process.env.GROQ_FALLBACK_MODEL || "openai/gpt-oss-120b",
-                apiKey,
-                temperature,
-                maxTokens,
-                maxRetries: 1,
-                configuration: {
-                    baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
-                },
-            });
-
-            return new Proxy(primary, {
-                get(target: any, prop: string | symbol, receiver: any) {
-                    if (prop === "bindTools") {
-                        return (tools: any[], fields?: any) => {
-                            const boundPrimary = target.bindTools(tools, fields);
-                            const boundQwen = fallbackQwen.bindTools(tools, fields);
-                            const bound120b = fallback120b.bindTools(tools, fields);
-                            return boundPrimary.withFallbacks({ fallbacks: [boundQwen, bound120b] });
-                        };
-                    }
-                    if (prop === "invoke") {
-                        return (input: any, options?: any) => {
-                            return target.withFallbacks({ fallbacks: [fallbackQwen, fallback120b] }).invoke(input, options);
-                        };
-                    }
-                    return Reflect.get(target, prop, receiver);
-                },
-            });
-        }
-
-        if (provider === "openrouter") {
+        if (provider === "nvidia") {
             const { ChatOpenAI } = await import("@langchain/openai");
             return new ChatOpenAI({
                 model: modelName,
@@ -224,11 +147,7 @@ export class ModelManager {
                 maxTokens,
                 maxRetries: 3,
                 configuration: {
-                    baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-                    defaultHeaders: {
-                        "HTTP-Referer": "https://github.com/agentic/agent",
-                        "X-Title": "Agentic Software Developer",
-                    },
+                    baseURL: process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1",
                 },
             });
         }

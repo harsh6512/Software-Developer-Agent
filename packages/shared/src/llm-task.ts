@@ -23,23 +23,23 @@ export enum LLMTask {
 
 export const TASK_TO_CONFIG_DEFAULTS_MAP = {
     [LLMTask.PLANNER]: {
-        modelName: "groq:llama-3.3-70b-versatile",
+        modelName: "nvidia/nemotron-3.5-super-vl-120b-a12b",
         temperature: 0,
     },
     [LLMTask.PROGRAMMER]: {
-        modelName: "openrouter:openrouter/free",
+        modelName: "nvidia/nemotron-3.5-super-vl-120b-a12b",
         temperature: 0,
     },
     [LLMTask.REVIEWER]: {
-        modelName: "openrouter:openrouter/free",
+        modelName: "nvidia/nemotron-3.5-super-vl-120b-a12b",
         temperature: 0,
     },
     [LLMTask.ROUTER]: {
-        modelName: "openrouter:openrouter/free",
+        modelName: "nvidia/nemotron-3.5-super-vl-120b-a12b",
         temperature: 0,
     },
     [LLMTask.SUMMARIZER]: {
-        modelName: "openrouter:openrouter/free",
+        modelName: "nvidia/nemotron-3.5-super-vl-120b-a12b",
         temperature: 0,
     },
 };
