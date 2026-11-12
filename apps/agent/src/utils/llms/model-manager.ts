@@ -6,6 +6,7 @@ import { createLogger } from "../logger.js";
 const logger = createLogger("ModelManager");
 
 export const PROVIDER_FALLBACK_ORDER = [
+    "groq",
     "openrouter",
     "google-genai",
     "anthropic",
@@ -31,6 +32,9 @@ export class ModelManager {
         // 1. Check configurable if passed from frontend session
         const apiKeys = (graphConfig?.configurable as any)?.apiKeys;
         if (apiKeys) {
+            if (provider === "groq" && (apiKeys.groqApiKey || apiKeys.groq_api_key)) {
+                return apiKeys.groqApiKey || apiKeys.groq_api_key;
+            }
             if (provider === "openrouter" && (apiKeys.openrouterApiKey || apiKeys.openRouterApiKey)) {
                 return apiKeys.openrouterApiKey || apiKeys.openRouterApiKey;
             }
@@ -40,6 +44,9 @@ export class ModelManager {
         }
 
         // 2. Fall back to environment variables
+        if (provider === "groq") {
+            return process.env.GROQ_API_KEY;
+        }
         if (provider === "openrouter") {
             return process.env.OPENROUTER_API_KEY;
         }
@@ -73,14 +80,20 @@ export class ModelManager {
             temperature: 0,
         };
 
+        const taskEnvModel =
+            (task ? process.env[`${task.toUpperCase()}_MODEL_NAME`] : undefined) ||
+            (task ? process.env[`${task.toUpperCase()}_MODEL`] : undefined);
+
         const envModel =
+            taskEnvModel ||
             process.env.MODEL_NAME ||
             (process.env.OPENROUTER_MODEL
                 ? (process.env.OPENROUTER_MODEL.includes(":")
                     ? process.env.OPENROUTER_MODEL.trim()
                     : `openrouter:${process.env.OPENROUTER_MODEL.trim()}`)
                 : undefined) ||
-            (process.env.GEMINI_MODEL ? `google-genai:${process.env.GEMINI_MODEL.trim()}` : undefined);
+            (process.env.GEMINI_MODEL ? `google-genai:${process.env.GEMINI_MODEL.trim()}` : undefined) ||
+            (process.env.GROQ_MODEL ? `groq:${process.env.GROQ_MODEL.trim()}` : undefined);
 
         const rawConfiguredModel =
             (graphConfig?.configurable as any)?.[`${task}ModelName`] ||
@@ -92,8 +105,14 @@ export class ModelManager {
 
         if (rawConfiguredModel.includes(":")) {
             const [providerStr, ...modelRest] = rawConfiguredModel.split(":");
-            provider = (providerStr as Provider) || "openrouter";
-            modelName = modelRest.join(":") || "openrouter/free";
+            provider = (providerStr as Provider) || "groq";
+            modelName = modelRest.join(":") || "llama-3.3-70b-versatile";
+        } else if (rawConfiguredModel.startsWith("llama")) {
+            provider = "groq";
+            modelName = rawConfiguredModel;
+        } else if (rawConfiguredModel.startsWith("groq/")) {
+            provider = "groq";
+            modelName = rawConfiguredModel.replace("groq/", "");
         } else if (rawConfiguredModel.startsWith("openrouter/")) {
             provider = "openrouter";
             modelName = rawConfiguredModel;
@@ -123,7 +142,7 @@ export class ModelManager {
     }
 
     /**
-     * Initializes the chat model via LangChain universal initChatModel or ChatOpenAI for OpenRouter
+     * Initializes the chat model via LangChain universal initChatModel, ChatOpenAI for Groq & OpenRouter
      */
     public async initializeModel(
         config: ModelLoadConfig,
@@ -139,6 +158,62 @@ export class ModelManager {
         }
 
         logger.info(`Initializing model: ${provider}:${modelName}`);
+
+        if (provider === "groq") {
+            const { ChatOpenAI } = await import("@langchain/openai");
+            const primary = new ChatOpenAI({
+                model: modelName,
+                apiKey,
+                temperature,
+                maxTokens,
+                maxRetries: 0,
+                configuration: {
+                    baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
+                },
+            });
+
+            // Groq fallbacks in case developer-tier accounts encounter decommission/404 on llama-3.3-70b-versatile
+            const fallbackQwen = new ChatOpenAI({
+                model: "qwen/qwen3.8-27b",
+                apiKey,
+                temperature,
+                maxTokens,
+                maxRetries: 1,
+                configuration: {
+                    baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
+                },
+            });
+
+            const fallback120b = new ChatOpenAI({
+                model: process.env.GROQ_FALLBACK_MODEL || "openai/gpt-oss-120b",
+                apiKey,
+                temperature,
+                maxTokens,
+                maxRetries: 1,
+                configuration: {
+                    baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
+                },
+            });
+
+            return new Proxy(primary, {
+                get(target: any, prop: string | symbol, receiver: any) {
+                    if (prop === "bindTools") {
+                        return (tools: any[], fields?: any) => {
+                            const boundPrimary = target.bindTools(tools, fields);
+                            const boundQwen = fallbackQwen.bindTools(tools, fields);
+                            const bound120b = fallback120b.bindTools(tools, fields);
+                            return boundPrimary.withFallbacks({ fallbacks: [boundQwen, bound120b] });
+                        };
+                    }
+                    if (prop === "invoke") {
+                        return (input: any, options?: any) => {
+                            return target.withFallbacks({ fallbacks: [fallbackQwen, fallback120b] }).invoke(input, options);
+                        };
+                    }
+                    return Reflect.get(target, prop, receiver);
+                },
+            });
+        }
 
         if (provider === "openrouter") {
             const { ChatOpenAI } = await import("@langchain/openai");
