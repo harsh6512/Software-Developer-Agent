@@ -19,15 +19,11 @@ export enum LLMTask {
      * Used for summarizing conversation history.
      */
     SUMMARIZER = "summarizer",
-    /**
-     * Used for running tests and verifying regressions.
-     */
-    TESTING = "testing",
 }
 
 export const TASK_TO_CONFIG_DEFAULTS_MAP = {
     [LLMTask.PLANNER]: {
-        modelName: "openrouter:openrouter/free",
+        modelName: "groq:llama-3.3-70b-versatile",
         temperature: 0,
     },
     [LLMTask.PROGRAMMER]: {
@@ -43,10 +39,6 @@ export const TASK_TO_CONFIG_DEFAULTS_MAP = {
         temperature: 0,
     },
     [LLMTask.SUMMARIZER]: {
-        modelName: "openrouter:openrouter/free",
-        temperature: 0,
-    },
-    [LLMTask.TESTING]: {
         modelName: "openrouter:openrouter/free",
         temperature: 0,
     },
